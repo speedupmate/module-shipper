@@ -55,6 +55,11 @@ class Shipper extends AbstractCarrier implements CarrierInterface
 {
 
     /**
+     * Request rate limiting interval in seconds
+     */
+    const REQUEST_INTERVAL = 60;
+
+    /**
      * Flag for check carriers for activity
      *
      * @var string
@@ -246,6 +251,22 @@ class Shipper extends AbstractCarrier implements CarrierInterface
     public function collectRates(RateRequest $request)
     {
         if (!$this->getConfigFlag(self::ACTIVE_FLAG)) {
+            return false;
+        }
+
+        //set a hash based check if request is already made with same data
+        //set a time based check if request is already made with set time limit
+        $requestHashTime = time();
+        $requestHash = crc32($request->toJson());
+        $requestHashTimeLimit = $requestHashTime - self::REQUEST_INTERVAL;
+
+        if(
+            $requestHash !== $this->checkoutSession->getRequestHash() ||
+            $requestHashTimeLimit > $this->checkoutSession->getRequestHashTime()
+        ) {
+            $this->checkoutSession->setRequestHash($requestHash);
+            $this->checkoutSession->setRequestHashTime($requestHashTime);
+        } else {
             return false;
         }
 
